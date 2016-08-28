@@ -9,6 +9,7 @@ use App\Models\Payback;
 use App\Services\Auth;
 use App\Services\Config;
 use App\Utils\Tools;
+use App\Utils\Telegram;
 
 /**
  *  HomeController
@@ -17,9 +18,16 @@ class HomeController extends BaseController
 {
 
     public function index()
-    {
-        return $this->view()->display('index.tpl');
-    }
+    {  
+	   if(Config::get('forced_https')=='true'){ 
+	     if($_SERVER['SERVER_PORT'] != 443){
+		   return $this->view()->display('301.tpl');
+		   }
+		 else{
+           return $this->view()->display('index.tpl');
+		   }
+        }else{return $this->view()->display('index.tpl');}
+	}
 
     public function code()
     {
@@ -40,6 +48,25 @@ class HomeController extends BaseController
 	public function staff()
     {
         return $this->view()->display('staff.tpl');
+    }
+	
+	
+	public function telegram()
+    {
+		try {
+			$bot = new \TelegramBot\Api\Client(Config::get('telegram_token'));
+			// or initialize with botan.io tracker api key
+			// $bot = new \TelegramBot\Api\Client('YOUR_BOT_API_TOKEN', 'YOUR_BOTAN_TRACKER_API_KEY');
+
+			$bot->command('ping', function ($message) use ($bot) {
+				$bot->sendMessage($message->getChat()->getId(), 'Pong!这个群组的 ID 是 '.$message->getChat()->getId().'!');
+			});
+
+			$bot->run();
+
+		} catch (\TelegramBot\Api\Exception $e) {
+			$e->getMessage();
+		}
     }
 	
 	public function page404($request, $response, $args)
@@ -96,7 +123,6 @@ class HomeController extends BaseController
 	
 	public function pmw_pingback($request, $response, $args)
     {
-        require_once(BASE_PATH.'/vendor/paymentwall/paymentwall-php/lib/paymentwall.php');
 		
 		if(Config::get('pmw_publickey')!="")
 		{
@@ -152,6 +178,21 @@ class HomeController extends BaseController
 			  
 			  
 				echo 'OK'; // Paymentwall expects response to be OK, otherwise the pingback will be resent
+				
+				
+				if(Config::get('enable_donate') == 'true')
+				{
+					if($user->is_hide == 1)
+					{
+						Telegram::Send("姐姐姐姐，一位不愿透露姓名的大老爷给我们捐了 ".$codeq->number." 元呢~");
+					}
+					else
+					{
+						Telegram::Send("姐姐姐姐，".$user->user_name." 大老爷给我们捐了 ".$codeq->number." 元呢~");
+					}
+				}
+			
+			
 			} else {
 				echo $pingback->getErrorSummary();
 			}
@@ -161,7 +202,5 @@ class HomeController extends BaseController
 			echo 'error';
 		}
     }
-	
-	
 
 }
